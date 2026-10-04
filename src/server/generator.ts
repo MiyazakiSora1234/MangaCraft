@@ -1,6 +1,6 @@
 // 生成パイプライン：全体の構成 → ページごとのネーム → コマ画像
 import { buildLayout } from "../shared/layout.ts";
-import { isPageBusy, type Page, type Project, type RegenerateMode, type Style, type StyleRef } from "../shared/types.ts";
+import { isPageBusy, type ContentRating, type Page, type Project, type RegenerateMode, type Style, type StyleRef } from "../shared/types.ts";
 import { buildImagePrompt, generatePanelImage, releaseImageModel } from "./images/index.ts";
 import { llm } from "./llm/index.ts";
 import { newId, saveProject } from "./store.ts";
@@ -46,13 +46,22 @@ const newLayout = (project: Project, page: Page) => buildLayout(page.panels, `${
 
 // ---------- 作品 ----------
 
-export function createProject({ synopsis, pageCount, style, title }: { synopsis: string; pageCount: number; style: Style; title: string }): Project {
+interface NewProject {
+  synopsis: string;
+  pageCount: number;
+  style: Style;
+  title: string;
+  rating: ContentRating;
+}
+
+export function createProject({ synopsis, pageCount, style, title, rating }: NewProject): Project {
   const project: Project = {
     id: newId(),
     createdAt: new Date().toISOString(),
     status: "planning",
     error: null,
     input: { synopsis, pageCount, title },
+    rating,
     style,
     title: title || "生成中…",
     logline: "",
@@ -76,7 +85,7 @@ export function retryPlan(project: Project): void {
 async function runProject(project: Project): Promise<void> {
   try {
     await prepareGpuForLlm();
-    const plan = await llm.generatePlan({ ...project.input, style: project.style });
+    const plan = await llm.generatePlan({ ...project.input, style: project.style, rating: project.rating });
     Object.assign(project, {
       title: plan.title,
       logline: plan.logline,
@@ -177,7 +186,7 @@ async function drawPanel(project: Project, page: Page, i: number, extra = ""): P
     const url = await generatePanelImage({
       projectId: project.id,
       key: `p${page.number}-${i}`,
-      prompt: buildImagePrompt({ panel, style: project.style, characters: project.characters, extra }),
+      prompt: buildImagePrompt({ panel, style: project.style, characters: project.characters, rating: project.rating, extra }),
       aspect,
       label: panel.description,
       styleRef: project.styleRef?.url,

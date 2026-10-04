@@ -1,12 +1,14 @@
-// LLM に渡すプロンプト（Claude / ローカルLLM 共通）
+// LLM に渡すプロンプト
 import { MAX_PANELS } from "../../shared/layout.ts";
-import type { Character, OutlinePage, Panel, Project, Style } from "../../shared/types.ts";
+import type { Character, ContentRating, OutlinePage, Panel, Project, Style } from "../../shared/types.ts";
+import { ADULT_MIN_AGE } from "../adult.ts";
 
 export interface PlanInput {
   synopsis: string;
   pageCount: number;
   title: string;
   style: Style;
+  rating: ContentRating;
 }
 
 export interface PageInput {
@@ -23,8 +25,19 @@ export const SYSTEM = `あなたは日本の商業漫画の経験豊富なスト
 - 出力は指定されたJSONのみとし、説明文やコードブロックは付けません。`;
 
 function characterSheet(characters: Character[]) {
-  return characters.map((c) => `- ${c.name}（${c.role}）: ${c.appearance}`).join("\n");
+  return characters.map((c) => `- ${c.name}（${c.role}${c.age !== null ? `・${c.age}歳` : ""}）: ${c.appearance}`).join("\n");
 }
+
+// 成人向け（R18）作品のルール。登場人物は全員成人で、未成年を想起させる内容は書かない
+const ADULT_RULES = `
+# 成人向け（R18）作品のルール（必ず守る）
+- 成人向けの作品として、概要に沿った性的な描写を含めてよい。
+- 登場人物は人間以外も含めて全員${ADULT_MIN_AGE}歳以上の成人にする。age には${ADULT_MIN_AGE}以上の年齢を書く。
+- 子ども・未成年・学生・学校・制服を登場させたり、想起させたりしない。幼い外見や体つきにしない。
+- appearance と imagePrompt では、人物を "adult woman" / "adult man" のように成人として書き、girl / boy / young / petite / loli などの語は使わない。
+`;
+
+const ratingRules = (rating: ContentRating) => (rating === "adult" ? ADULT_RULES : "");
 
 // このページに必要な最低コマ数（1場面＝1コマ以上）
 export function minPanelsFor(outlinePage: OutlinePage): number {
@@ -41,7 +54,7 @@ function panelLines(panels: Panel[]) {
     .join("\n");
 }
 
-export function planPrompt({ synopsis, pageCount, style, title }: PlanInput): string {
+export function planPrompt({ synopsis, pageCount, style, title, rating }: PlanInput): string {
   return `次の概要をもとに、全${pageCount}ページの漫画の構成を作ってください。概要が原作です。
 
 # 概要（原作）
@@ -54,7 +67,7 @@ ${style.label}
 - facts: 最初に、概要に書かれている設定を箇条書きで書き出す（日本語・3〜8個）。登場人物の名前・性別・立場、起きている事件、目的、結末を必ず含める。概要にない情報は書かない。
 - title: 作品タイトル（日本語）${title ? "。タイトル案があればそれを使う" : ""}
 - logline: 作品の一行紹介（日本語）
-- characters: 物語に登場する人物（脇役も含め最大6人）。
+- characters: 物語に登場する人物（脇役も含め最大6人）。age は年齢（整数）。
   appearance は画像生成AI向けの英語タグをカンマ区切りで書く（例: "1girl, young girl, short messy brown hair, big blue eyes, oversized witch hat, brown robe"）。
   性別・年齢・髪型・髪色・目・服装・特徴的な小物を、全コマで同じ見た目を保てるよう具体的に。人間以外は "black cat, no humans" のように種類をはっきり書く。
   画風・色づかい・線のタッチ（manga style, watercolor など）は書かない。
@@ -72,7 +85,7 @@ ${style.label}
 # 概要を守る（最重要）
 - facts に書いた設定（人物の名前・性別・立場、事件、目的、結末）をそのまま使い、変えない。
 - 概要にない大きな設定（記憶喪失、新しい敵、世界の秘密など）を勝手に足さない。脇役は物語に必要な最小限にする。
-
+${ratingRules(rating)}
 # もう一度、概要（原作）
 ${synopsis}`;
 }
@@ -134,5 +147,6 @@ ${nextSection}${instruction ? `\n# 作り直しの要望（最優先で反映）
 - bubbles: 1コマに0〜3個。絵だけでは伝わらない情報（誰が何を知ったか・何を決めたか・場所や時間の変化）は、必ずセリフかナレーションで読者に伝える。
   ページ全体で4個以上を目安にする（無言のコマは見せ場だけ）。
   type は speech（会話）/ thought（心の声）/ shout（叫び）/ narration（ナレーション）。
-  position はコマ内の配置で、話者の頭上付近になるよう選ぶ。narration の speaker は空文字でよい。`;
+  position はコマ内の配置で、話者の頭上付近になるよう選ぶ。narration の speaker は空文字でよい。
+${ratingRules(project.rating)}`;
 }

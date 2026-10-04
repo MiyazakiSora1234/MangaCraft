@@ -1,15 +1,20 @@
 // Ollama でストーリー構成とネームを作る。出力は JSON Schema（format）で形を指定する
+import type { ContentRating } from "../../shared/types.ts";
+import { assertAdultPlan, assertAdultScript } from "../adult.ts";
 import { config } from "../config.ts";
 import type { Llm } from "./index.ts";
 import { finalizePlan, normalizeScript, withCoverage } from "./output.ts";
 import { minPanelsFor, pagePrompt, planPrompt, SYSTEM } from "./prompts.ts";
 import { pageSchema, planSchema } from "./schema.ts";
 
-const { url, model, numCtx } = config.ollama;
+const { url, numCtx } = config.ollama;
 const MAX_ATTEMPTS = 3;
 
+// 成人向けの作品だけ別のモデルを使う
+const modelFor = (rating: ContentRating) => (rating === "adult" ? config.ollama.adultModel : config.ollama.model);
+
 // 応答はストリーミングで受け取る（生成に数分かかってもタイムアウトしないように）
-async function chat(prompt: string, schema: object): Promise<string> {
+async function chat(model: string, prompt: string, schema: object): Promise<string> {
   let res: Response;
   try {
     res = await fetch(`${url}/api/chat`, {
@@ -26,6 +31,7 @@ async function chat(prompt: string, schema: object): Promise<string> {
   } catch {
     throw new Error(`Ollama（${url}）に接続できません。起動しているか確認してください。`);
   }
+  if (res.status === 404) throw new Error(`Ollama にモデル ${model} がありません。ターミナルで「ollama pull ${model}」を実行してください。`);
   if (!res.ok) throw new Error(`Ollama エラー (${res.status}): ${(await res.text().catch(() => "")).slice(0, 300)}`);
 
   // 1 行に 1 つの JSON が流れてくる
@@ -49,10 +55,10 @@ async function chat(prompt: string, schema: object): Promise<string> {
 }
 
 // 出力が壊れていた場合（JSON として読めない・コマが空など）だけ数回やり直す
-async function generate<T>(prompt: string, schema: object, transform: (json: unknown) => T): Promise<T> {
+async function generate<T>(model: string, prompt: string, schema: object, transform: (json: unknown) => T): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const text = await chat(prompt, schema);
+    const text = await chat(model, prompt, schema);
     try {
       return transform(JSON.parse(text));
     } catch (err) {
@@ -64,21 +70,34 @@ async function generate<T>(prompt: string, schema: object, transform: (json: unk
 }
 
 export const ollama: Llm = {
-  describe: () => `Ollama ${model} (${url})`,
+  describe: () => `Ollama ${config.ollama.model}・成人向け ${config.ollama.adultModel} (${url})`,
 
-  generatePlan: (input) => generate(planPrompt(input), planSchema, (json) => finalizePlan(json, input)),
+  // 成人向けの作品では、出力に未成年が含まれていないかを確認し、含まれていれば作り直す
+  generatePlan: (input) => generate(modelFor(input.rating), planPrompt(input), planSchema, (json) => {
+    const plan = finalizePlan(json, input);
+    if (input.rating === "adult") assertAdultPlan(plan);
+    return plan;
+  }),
 
   generatePageScript(input) {
+    const { rating } = input.project;
     const prompt = pagePrompt(input);
-    return withCoverage(() => generate(prompt, pageSchema, normalizeScript), minPanelsFor(input.project.outline[input.pageNumber - 1]));
+    const minPanels = minPanelsFor(input.project.outline[input.pageNumber - 1]);
+    return withCoverage(() => generate(modelFor(rating), prompt, pageSchema, (json) => {
+      const script = normalizeScript(json);
+      if (rating === "adult") assertAdultScript(script);
+      return script;
+    }), minPanels);
   },
 
   // モデルをメモリから降ろす（作画前に VRAM を空けるため）。失敗しても処理は続ける
   async release() {
-    await fetch(`${url}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, keep_alive: 0 }),
-    }).catch(() => {});
+    for (const model of new Set([config.ollama.model, config.ollama.adultModel])) {
+      await fetch(`${url}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, keep_alive: 0 }),
+      }).catch(() => {});
+    }
   },
 };

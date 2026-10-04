@@ -15,8 +15,8 @@ export const mockLlm: Llm = {
       title: title || "（モック）" + synopsis.slice(0, 12),
       logline: synopsis.slice(0, 60),
       characters: [
-        { name: "ハル", role: "主人公", appearance: "teenage boy, messy black hair, school uniform" },
-        { name: "ミオ", role: "相棒", appearance: "teenage girl, long silver hair, red scarf" },
+        { name: "ハル", role: "主人公", age: 24, appearance: "man, messy black hair, travel cloak" },
+        { name: "ミオ", role: "相棒", age: 23, appearance: "woman, long silver hair, red scarf" },
       ],
       pages: Array.from({ length: pageCount }, (_, i) => ({
         page: i + 1,

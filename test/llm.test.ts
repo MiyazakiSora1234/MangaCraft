@@ -8,7 +8,7 @@ import { minPanelsFor, pagePrompt } from "../src/server/llm/prompts.ts";
 test("finalizePlan はページ数をそろえ、欠けた項目を補う", () => {
   const plan = finalizePlan({ title: " 題 ", characters: [{ name: "A" }, { name: "" }], pages: [{ summary: "s1", beats: ["b1", ""] }] }, { pageCount: 3, title: "" });
   assert.equal(plan.title, "題");
-  assert.deepEqual(plan.characters, [{ name: "A", role: "", appearance: "" }]);
+  assert.deepEqual(plan.characters, [{ name: "A", role: "", age: null, appearance: "" }]);
   assert.equal(plan.pages.length, 3);
   assert.deepEqual(plan.pages[0], { page: 1, summary: "s1", beats: ["b1"] });
   assert.deepEqual(plan.pages[2], { page: 3, summary: "（物語の続き）", beats: ["（物語の続き）"] });

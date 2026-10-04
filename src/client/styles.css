@@ -106,6 +106,16 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .project-title { font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .project-title:hover { color: var(--accent); }
 .empty { grid-column: 1 / -1; text-align: center; padding: 24px; }
+.tags { display: flex; gap: 6px; }
+.tag.r18 { background: #fde8e8; color: var(--danger); font-weight: 700; }
+h1 .tag.r18 { font-family: var(--font); font-size: 13px; vertical-align: middle; margin-left: 10px; }
+/* 成人向けの表紙は一覧でぼかす（カーソルを合わせると表示） */
+.cover.adult img { filter: blur(8px); transition: filter .2s; }
+.cover.adult:hover img { filter: none; }
+.adult-note { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; }
+.adult-note p { margin: 0 0 8px; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; }
+.check input { width: auto; }
 
 /* ---------- 作品ビュー ---------- */
 .generating { padding: 48px 32px; max-width: 640px; margin: 40px auto; }

@@ -11,7 +11,8 @@ test("プロンプトは絵柄 → 人物 → 場面の順で、ネガティブ�
   const prompt = buildImagePrompt({
     panel: { imagePrompt: "a girl runs", characters: ["ルナ"] },
     style: { id: "s", label: "s", prompt: "monochrome", negative: "color", monochrome: true },
-    characters: [{ name: "ルナ", role: "", appearance: "1girl, brown hair" }, { name: "クロ", role: "", appearance: "black cat" }],
+    characters: [{ name: "ルナ", role: "", age: 20, appearance: "1girl, brown hair" }, { name: "クロ", role: "", age: null, appearance: "black cat" }],
+    rating: "general",
   });
   assert.equal(prompt.positive, "monochrome, masterpiece, best quality, 1girl, brown hair, a girl runs");
   assert.ok(prompt.negative.startsWith("color, "));

@@ -1,5 +1,6 @@
 // 画像生成モデル（SDXL）に渡すプロンプトを作る
-import type { Character, PanelScript, Style } from "../../shared/types.ts";
+import type { Character, ContentRating, PanelScript, Style } from "../../shared/types.ts";
+import { ADULT_NEGATIVE, ADULT_POSITIVE, adultify } from "../adult.ts";
 import type { ImagePrompt } from "./types.ts";
 
 const NEGATIVE_PROMPT =
@@ -19,19 +20,24 @@ interface PromptInput {
   panel: Pick<PanelScript, "characters" | "imagePrompt">;
   style: Style;
   characters: Character[];
+  rating: ContentRating;
   extra?: string; // 描き直し時の要望
 }
 
-// 絵柄 → 人物 → 場面の順に並べ、絵柄が全コマで揃うようにする
-export function buildImagePrompt({ panel, style, characters, extra = "" }: PromptInput): ImagePrompt {
+// 絵柄 → 人物 → 場面の順に並べ、絵柄が全コマで揃うようにする。
+// 成人向けでは、人物・場面・要望から幼さを示す言葉を取り除き、成人であることを明示する
+export function buildImagePrompt({ panel, style, characters, rating, extra = "" }: PromptInput): ImagePrompt {
+  const adult = rating === "adult";
+  const clean = (text: string) => (adult ? adultify(contentOnly(text)) : contentOnly(text));
   const cast = characters.filter((c) => panel.characters.includes(c.name));
   const positive = [
     style.prompt,
     "masterpiece, best quality",
-    ...cast.map((c) => contentOnly(c.appearance)),
-    contentOnly(panel.imagePrompt),
-    extra,
+    adult ? ADULT_POSITIVE : "",
+    ...cast.map((c) => clean(c.appearance)),
+    clean(panel.imagePrompt),
+    adult ? adultify(extra) : extra,
   ].filter(Boolean).join(", ");
-  const negative = [style.negative, NEGATIVE_PROMPT].filter(Boolean).join(", ");
+  const negative = [adult ? ADULT_NEGATIVE : "", style.negative, NEGATIVE_PROMPT].filter(Boolean).join(", ");
   return { positive, negative, monochrome: Boolean(style.monochrome) };
 }

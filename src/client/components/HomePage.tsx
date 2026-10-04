@@ -1,6 +1,6 @@
 // ホーム：作成フォームと作品一覧
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { ProjectSummary } from "../../shared/types.ts";
+import type { ContentRating, ProjectSummary } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useConfig } from "../config.ts";
 import { projectHash } from "../hooks/route.ts";
@@ -31,6 +31,8 @@ function CreateForm() {
   const [pageCount, setPageCount] = useState(4);
   const [styleId, setStyleId] = useState(styles[0]?.id ?? "custom");
   const [customStyle, setCustomStyle] = useState("");
+  const [rating, setRating] = useState<ContentRating>("general");
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const clampPages = (n: number) => Math.min(maxPages, Math.max(1, n || 1));
@@ -43,7 +45,7 @@ function CreateForm() {
     }
     setSubmitting(true);
     try {
-      const { id } = await api.createProject({ synopsis, title, pageCount, styleId, customStyle });
+      const { id } = await api.createProject({ synopsis, title, pageCount, styleId, customStyle, rating, adultConfirmed });
       location.hash = projectHash(id);
     } catch (err) {
       toast((err as Error).message, true);
@@ -91,6 +93,30 @@ function CreateForm() {
           placeholder="絵柄の補足（任意）例：90年代アニメ風、ジブリ風の背景、レトロなスクリーントーン"
         />
       </div>
+      <div className="field">
+        <span>年齢区分</span>
+        <div className="style-grid">
+          <label className="style-chip">
+            <input type="radio" name="rating" checked={rating === "general"} onChange={() => setRating("general")} />
+            <span><strong>全年齢</strong><small>性的な描写なし</small></span>
+          </label>
+          <label className="style-chip">
+            <input type="radio" name="rating" checked={rating === "adult"} onChange={() => setRating("adult")} />
+            <span><strong>成人向け（R18）</strong><small>性的な描写を含む</small></span>
+          </label>
+        </div>
+        {rating === "adult" && (
+          <div className="adult-note">
+            <p className="muted">
+              登場人物はすべて20歳以上の成人として描かれます。未成年や学校を想起させる言葉（高校生・少女・制服など）を含む概要は使えません。
+            </p>
+            <label className="check">
+              <input type="checkbox" required checked={adultConfirmed} onChange={(e) => setAdultConfirmed(e.target.checked)} />
+              私は18歳以上です
+            </label>
+          </div>
+        )}
+      </div>
       <div className="form-actions">
         <button className="btn primary large" type="submit" disabled={submitting}>漫画を生成する</button>
       </div>
@@ -116,13 +142,16 @@ function ProjectList() {
       {projects.length === 0 && <p className="muted empty">まだ作品はありません。上のフォームから最初の漫画を作りましょう。</p>}
       {projects.map((p) => (
         <article key={p.id} className="project-card">
-          <a href={projectHash(p.id)} className="cover">
-            {p.cover ? <img src={p.cover} alt="" loading="lazy" /> : <span className="cover-empty">漫</span>}
+          <a href={projectHash(p.id)} className={`cover ${p.rating === "adult" ? "adult" : ""}`}>
+            {p.cover ? <img src={p.cover} alt="" /> : <span className="cover-empty">漫</span>}
           </a>
           <div className="project-meta">
             <a href={projectHash(p.id)} className="project-title">{p.title}</a>
             <small className="muted">{p.pageCount}ページ・{p.style}・{new Date(p.createdAt).toLocaleDateString("ja-JP")}</small>
-            {PROJECT_STATUS_LABEL[p.status] && <span className={`tag ${p.status}`}>{PROJECT_STATUS_LABEL[p.status]}</span>}
+            <div className="tags">
+              {p.rating === "adult" && <span className="tag r18">R18</span>}
+              {PROJECT_STATUS_LABEL[p.status] && <span className={`tag ${p.status}`}>{PROJECT_STATUS_LABEL[p.status]}</span>}
+            </div>
           </div>
           <button className="icon-btn" title="削除" aria-label="削除" onClick={() => remove(p.id)}>✕</button>
         </article>

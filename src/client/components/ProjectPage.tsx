@@ -111,7 +111,7 @@ function Viewer({ project, setProject, reload, busy, initialPage }: ViewerProps)
       <div className="project-head">
         <div>
           <a href="#/" className="back">← 作品一覧</a>
-          <h1>{project.title}</h1>
+          <h1>{project.title}{project.rating === "adult" && <span className="tag r18">R18</span>}</h1>
           <p className="muted">{project.logline}</p>
         </div>
         <div className="head-actions">

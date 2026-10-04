@@ -15,10 +15,11 @@ export const planSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "role", "appearance"],
+        required: ["name", "role", "age", "appearance"],
         properties: {
           name: { type: "string" },
           role: { type: "string" },
+          age: { type: "integer" },
           appearance: { type: "string" },
         },
       },

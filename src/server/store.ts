@@ -20,6 +20,9 @@ export async function initStore(): Promise<Project[]> {
     if (!file.endsWith(".json")) continue;
     try {
       const project = JSON.parse(await fs.readFile(path.join(PROJECT_DIR, file), "utf8")) as Project;
+      // 年齢区分と登場人物の年齢は後から加えた項目なので、以前の作品には既定値を入れる
+      project.rating ??= "general";
+      for (const c of project.characters) c.age ??= null;
       cache.set(project.id, project);
     } catch (err) {
       console.warn(`[store] ${file} を読み込めませんでした:`, (err as Error).message);

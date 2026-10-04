@@ -77,6 +77,7 @@ export interface Page {
 export interface Character {
   name: string;
   role: string;
+  age: number | null; // 年齢（成人向けの作品では全員 20 歳以上であることを確認する）
   appearance: string;
 }
 
@@ -104,6 +105,9 @@ export interface StyleRef {
 
 export type ProjectStatus = "planning" | "ready" | "error";
 
+// general = 全年齢 / adult = 成人向け（R18）
+export type ContentRating = "general" | "adult";
+
 export interface Project {
   id: string;
   createdAt: string;
@@ -111,6 +115,7 @@ export interface Project {
   status: ProjectStatus;
   error: string | null;
   input: { synopsis: string; pageCount: number; title: string };
+  rating: ContentRating;
   style: Style;
   title: string;
   logline: string;
@@ -130,6 +135,7 @@ export interface ProjectSummary {
   createdAt: string;
   pageCount: number;
   style: string;
+  rating: ContentRating;
   cover: string | null;
 }
 
@@ -145,6 +151,8 @@ export interface CreateProjectRequest {
   pageCount: number;
   styleId: string;
   customStyle?: string;
+  rating: ContentRating;
+  adultConfirmed?: boolean; // 成人向けのとき、利用者が 18 歳以上であることの確認
 }
 
 export type RegenerateMode = "all" | "images";

@@ -24,7 +24,7 @@ const MAX_BUBBLES_PER_PANEL = 3;
 
 export function finalizePlan(plan: any, { pageCount, title }: { pageCount: number; title: string }): Plan {
   const characters = arr(plan?.characters)
-    .map((c) => ({ name: str(c?.name).trim(), role: str(c?.role), appearance: str(c?.appearance) }))
+    .map((c) => ({ name: str(c?.name).trim(), role: str(c?.role), age: Number.isFinite(Number(c?.age)) ? Number(c.age) : null, appearance: str(c?.appearance) }))
     .filter((c) => c.name)
     .slice(0, MAX_CHARACTERS);
   const pages = Array.from({ length: pageCount }, (_, i) => {

@@ -28,6 +28,17 @@ VRAM 16GB 程度の GPU 1 枚で動きます。
 - **コマ単位**：コマをクリックして、そのコマだけ描き直し／セリフの修正／絵柄の見本に設定
 - **印刷・PDF保存**：全ページを B5 で印刷（ブラウザの「PDF に保存」で PDF 化）
 
+### 成人向け（R18）
+
+作成時に年齢区分で「成人向け」を選ぶと、性的な描写を含む作品を作れます。文章は `OLLAMA_ADULT_MODEL` のモデル（既定は dolphin-mistral。`ollama pull` で別途取得）で作り、全年齢の作品とは分けています。
+
+登場人物はすべて 20 歳以上の成人として扱い、未成年を想起させる内容は作りません。
+
+- 概要・タイトル・絵柄・要望・セリフに未成年や学校を想起させる言葉（高校生・少女・制服など）があれば受け付けない
+- LLM が出した登場人物に 20 歳未満がいる、または構成・ネームに未成年を想起させる内容があれば作り直し、直らなければ止める
+- 作画の指示から幼さを示す語を取り除き、成人であることを明示する（ネガティブプロンプトにも追加）
+- 作品一覧では成人向けの表紙をぼかして表示する
+
 ## 準備
 
 ### 1. Ollama
@@ -98,6 +109,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml exec ollama ollam
 | 変数 | 説明 |
 |---|---|
 | `OLLAMA_URL` / `OLLAMA_MODEL` / `OLLAMA_NUM_CTX` | Ollama の接続先・モデル・コンテキスト長 |
+| `OLLAMA_ADULT_MODEL` | 成人向け（R18）の作品で使うモデル |
 | `DIFFUSERS_URL` | 画像生成サーバの接続先 |
 | `DIFFUSERS_MODEL` / `DIFFUSERS_OFFLOAD` | 画像生成サーバのモデル・VRAM 節約モード（画像生成サーバ側の設定） |
 | `PORT` / `MAX_PAGES` | アプリのポート・最大ページ数 |
@@ -112,6 +124,7 @@ src/shared/          サーバと画面で共有するもの
   layout.ts          内容に応じたコマ割り
   bubbles.ts         吹き出しの整形
 src/server/
+  adult.ts           成人向け（R18）作品の安全策（未成年の排除）
   index.ts           HTTP サーバ（API・画面とコマ画像の配信）
   config.ts          設定（環境変数）の読み込み
   generator.ts       生成パイプライン（構成 → ネーム → 作画）と作り直し

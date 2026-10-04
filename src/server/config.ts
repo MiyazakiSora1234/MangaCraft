@@ -20,6 +20,8 @@ export const config = {
   ollama: {
     url: serviceUrl("OLLAMA_URL", "http://localhost:11434"),
     model: str("OLLAMA_MODEL", "gemma3:12b"),
+    // 成人向け（R18）の作品だけで使うモデル
+    adultModel: str("OLLAMA_ADULT_MODEL", "dolphin-mistral"),
     numCtx: Number(str("OLLAMA_NUM_CTX", "16384")),
   },
   diffusersUrl: serviceUrl("DIFFUSERS_URL", "http://localhost:7861"),

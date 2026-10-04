@@ -3,6 +3,7 @@ import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { normalizeBubbles } from "../shared/bubbles.ts";
 import type { AppConfig, Page, Project, ProjectSummary } from "../shared/types.ts";
+import { findMinorReference } from "./adult.ts";
 import { config } from "./config.ts";
 import {
   createProject, isPageLocked, recoverInterrupted, regeneratePage, regeneratePanel, relayoutPage, retryPlan, setStyleRef,
@@ -65,6 +66,13 @@ function ensureIdle(_req: Request, res: Response, next: NextFunction) {
 
 const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
 
+// 成人向けの作品に、未成年を想起させる言葉が入るのを防ぐ
+function rejectMinorReference(project: Pick<Project, "rating">, where: string, ...texts: string[]) {
+  if (project.rating !== "adult") return;
+  const word = findMinorReference(...texts);
+  if (word) throw new HttpError(400, `${where}に未成年を想起させる言葉（「${word}」）が含まれるため、成人向けの作品では使えません。`);
+}
+
 // ---------- API ----------
 
 app.get("/api/config", (_req, res) => {
@@ -79,6 +87,7 @@ const summary = (p: Project): ProjectSummary => ({
   createdAt: p.createdAt,
   pageCount: p.input.pageCount,
   style: p.style.label,
+  rating: p.rating,
   cover: p.pages[0]?.panels?.find((x) => x.image?.url)?.image.url ?? null,
 });
 
@@ -95,8 +104,12 @@ app.post("/api/projects", (req, res) => {
   if (/�/.test(synopsis + title)) throw new HttpError(400, "文字化けしています。UTF-8 で送信してください");
   if (synopsis.length > MAX_SYNOPSIS) throw new HttpError(400, `概要は${MAX_SYNOPSIS}文字以内にしてください`);
   if (!(pageCount >= 1 && pageCount <= config.maxPages)) throw new HttpError(400, `ページ数は1〜${config.maxPages}で指定してください`);
-  const style = resolveStyle(String(req.body.styleId ?? ""), String(req.body.customStyle ?? "").slice(0, 300));
-  const project = createProject({ synopsis, pageCount, style, title });
+  const customStyle = String(req.body.customStyle ?? "").slice(0, 300);
+  const rating = req.body.rating === "adult" ? "adult" : "general";
+  if (rating === "adult" && req.body.adultConfirmed !== true) throw new HttpError(400, "成人向けの作品を作るには、18歳以上であることの確認が必要です");
+  rejectMinorReference({ rating }, "概要・タイトル・絵柄", synopsis, title, customStyle);
+  const style = resolveStyle(String(req.body.styleId ?? ""), customStyle);
+  const project = createProject({ synopsis, pageCount, style, title, rating });
   res.status(201).json({ id: project.id });
 });
 
@@ -131,7 +144,9 @@ app.post("/api/projects/:id/style-ref", (req, res) => {
 app.post("/api/projects/:id/pages/:n/regenerate", ensureIdle, (req, res) => {
   const { project, pageNumber } = locals(res);
   const mode = req.body.mode === "images" ? "images" : "all";
-  regeneratePage(project, pageNumber, { mode, instruction: text(req.body.instruction, MAX_INSTRUCTION) });
+  const instruction = text(req.body.instruction, MAX_INSTRUCTION);
+  rejectMinorReference(project, "要望", instruction);
+  regeneratePage(project, pageNumber, { mode, instruction });
   res.status(202).json({ ok: true });
 });
 
@@ -145,7 +160,9 @@ app.post("/api/projects/:id/pages/:n/relayout", ensureIdle, (_req, res) => {
 // 1コマだけ描き直す
 app.post("/api/projects/:id/pages/:n/panels/:i/regenerate", ensureIdle, (req, res) => {
   const { project, pageNumber } = locals(res);
-  regeneratePanel(project, pageNumber, Number(req.params.i), text(req.body.instruction, MAX_INSTRUCTION));
+  const instruction = text(req.body.instruction, MAX_INSTRUCTION);
+  rejectMinorReference(project, "要望", instruction);
+  regeneratePanel(project, pageNumber, Number(req.params.i), instruction);
   res.status(202).json({ ok: true });
 });
 
@@ -154,7 +171,9 @@ app.patch("/api/projects/:id/pages/:n/panels/:i/bubbles", ensureIdle, (req, res)
   const { project, page } = locals(res);
   if (!Array.isArray(req.body.bubbles)) throw new HttpError(400, "bubbles が不正です");
   const panel = page.panels[Number(req.params.i)];
-  panel.bubbles = normalizeBubbles(req.body.bubbles, { max: 4, textLength: 80, speakerLength: 30 });
+  const bubbles = normalizeBubbles(req.body.bubbles, { max: 4, textLength: 80, speakerLength: 30 });
+  rejectMinorReference(project, "セリフ", ...bubbles.flatMap((b) => [b.speaker, b.text]));
+  panel.bubbles = bubbles;
   saveProject(project);
   res.json(panel);
 });
