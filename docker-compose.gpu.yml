@@ -1,0 +1,41 @@
+# Ollama と Diffusers 画像生成サーバもコンテナで動かす構成（NVIDIA GPU が必要）
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml exec ollama ollama pull gemma3:12b
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  app:
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      DIFFUSERS_URL: http://image-server:7861
+    depends_on:
+      - ollama
+      - image-server
+
+  ollama:
+    image: ollama/ollama:latest
+    <<: *gpu
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+  image-server:
+    build: ./image-server
+    <<: *gpu
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - hf-models:/models # ダウンロードしたモデルのキャッシュ
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
+  hf-models:

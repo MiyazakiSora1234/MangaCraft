@@ -1,0 +1,22 @@
+# 使い方
+#   PC 上の Ollama / 画像生成サーバを使う:  docker compose up -d --build
+#   すべてコンテナで動かす（NVIDIA GPU）:  docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 3000
+      IN_DOCKER: "1" # .env の localhost を host.docker.internal に読み替える
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - mangacraft-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mangacraft-data:
