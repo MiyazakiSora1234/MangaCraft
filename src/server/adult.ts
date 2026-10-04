@@ -43,8 +43,9 @@ export function assertNoMinorReference(where: string, ...texts: string[]): void 
 // girl / boy は人数付き（1girl・2girls）や複数形も含めて取り除く
 const YOUTHFUL_WORDS = /\b(?:loli\w*|shota\w*|child\w*|kids?|teen\w*|underage|minor|petite|small breasts|flat chest|young|little|tiny|cute|schoolgirls?|schoolboys?|school uniform|randoseru|\d*(?:girl|boy)s?)\b/gi;
 
-export const ADULT_POSITIVE = "adult, mature, nsfw";
-export const ADULT_NEGATIVE = "child, loli, shota, teen, underage, young, petite, flat chest, small body, childlike, school uniform, randoseru";
+// explicit は Animagine の年齢区分タグで最も露骨な段階。モザイクや黒線が入らないよう censored 系を避ける
+export const ADULT_POSITIVE = "adult, mature, explicit, nsfw";
+export const ADULT_NEGATIVE = "child, loli, shota, teen, underage, young, petite, flat chest, small body, childlike, school uniform, randoseru, censored, mosaic censoring, bar censor";
 
 export function adultify(text: string): string {
   return text
