@@ -66,6 +66,18 @@ uv sync
 
 Node.js 24 以上が必要です。
 
+`make` が使える環境なら、よく使う操作は Makefile にまとめてあります（`make` で一覧を表示）。
+
+```bash
+make setup   # 初回の準備（依存パッケージと Ollama のモデルをすべて入れる）
+make local   # 画像生成サーバとアプリをまとめて起動
+make check   # 型チェック・テスト・ビルド
+```
+
+`uv` や `ollama` が PATH にない場合は `make setup UV=<uv の場所>` のように指定できます。
+
+make を使わない場合：
+
 ```bash
 cp .env.example .env   # 必要ならモデルなどを変更
 npm install
