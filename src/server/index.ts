@@ -162,12 +162,15 @@ app.patch("/api/projects/:id/pages/:n/panels/:i/bubbles", ensureIdle, (req, res)
 // ---------- 配信 ----------
 
 app.use("/images", express.static(IMAGE_DIR, { maxAge: "7d", immutable: true }));
-app.use(express.static(CLIENT_DIR));
-// 画面はハッシュでページを切り替えるので、API 以外はすべて index.html を返す
-app.get(/^(?!\/api\/|\/images\/).*/, (_req, res) => {
-  res.sendFile(path.join(CLIENT_DIR, "index.html"), (err) => {
-    if (err) res.status(404).send("画面がビルドされていません。npm run build を実行してください。");
-  });
+// 画面はハッシュ（#/...）でページを切り替えるので、配信するのは index.html とビルド済みの部品だけ。
+// index.html は毎回確認させ、更新後に古い画面が残らないようにする（部品はファイル名に版が入るので長くキャッシュしてよい）
+app.use(express.static(CLIENT_DIR, {
+  setHeaders: (res, file) => {
+    res.setHeader("Cache-Control", file.endsWith(".html") ? "no-cache" : "public, max-age=31536000, immutable");
+  },
+}));
+app.get("/", (_req, res) => {
+  res.status(404).send("画面がビルドされていません。npm run build を実行してください。");
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

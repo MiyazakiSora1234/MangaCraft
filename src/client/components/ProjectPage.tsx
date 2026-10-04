@@ -58,7 +58,12 @@ interface ViewerProps {
 function Viewer({ project, setProject, reload, busy, initialPage }: ViewerProps) {
   const toast = useToast();
   const total = project.pages.length;
-  const [current, setCurrent] = useState(() => Math.min(Math.max(1, initialPage), total));
+  const clampPage = (n: number) => Math.min(Math.max(1, n), total);
+  const [current, setCurrent] = useState(() => clampPage(initialPage));
+  // URL のページ番号が外から変わったとき（直接入力・戻る / 進む）に追従する
+  useEffect(() => {
+    setCurrent(Math.min(Math.max(1, initialPage), total));
+  }, [initialPage, total]);
   const [dialog, setDialog] = useState<{ type: "page" } | { type: "panel"; index: number } | null>(null);
 
   const page = project.pages[current - 1];
