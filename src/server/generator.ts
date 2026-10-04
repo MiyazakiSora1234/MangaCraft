@@ -94,9 +94,10 @@ interface NewProject {
   style: Style;
   title: string;
   rating: ContentRating;
+  model: string;
 }
 
-export function createProject({ synopsis, pageCount, style, title, rating }: NewProject): Project {
+export function createProject({ synopsis, pageCount, style, title, rating, model }: NewProject): Project {
   const project: Project = {
     id: newId(),
     createdAt: new Date().toISOString(),
@@ -104,6 +105,7 @@ export function createProject({ synopsis, pageCount, style, title, rating }: New
     error: null,
     input: { synopsis, pageCount, title },
     rating,
+    model,
     style,
     title: title || "生成中…",
     logline: "",
@@ -128,7 +130,7 @@ async function runProject(project: Project): Promise<void> {
   const signal = signalFor(project);
   try {
     await prepareGpuForLlm();
-    const plan = await llm.generatePlan({ ...project.input, style: project.style, rating: project.rating }, signal);
+    const plan = await llm.generatePlan({ ...project.input, style: project.style, rating: project.rating, model: project.model }, signal);
     signal.throwIfAborted();
     Object.assign(project, {
       title: plan.title,

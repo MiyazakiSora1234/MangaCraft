@@ -2,9 +2,9 @@
 import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { normalizeBubbles } from "../shared/bubbles.ts";
-import type { AppConfig, Page, Project, ProjectSummary } from "../shared/types.ts";
+import { normalizeModelName, type AppConfig, type Page, type Project, type ProjectSummary } from "../shared/types.ts";
 import { findMinorReference } from "./adult.ts";
-import { config } from "./config.ts";
+import { config, defaultModelFor } from "./config.ts";
 import {
   cancelProject, createProject, isPageLocked, isProjectRunning, recoverInterrupted, regeneratePage, regeneratePanel, relayoutPage, retryPlan,
   setStyleRef,
@@ -77,8 +77,22 @@ function rejectMinorReference(project: Pick<Project, "rating">, where: string, .
 // ---------- API ----------
 
 app.get("/api/config", (_req, res) => {
-  const body: AppConfig = { styles: STYLES, maxPages: config.maxPages, mock: config.mock };
+  const body: AppConfig = {
+    styles: STYLES,
+    maxPages: config.maxPages,
+    mock: config.mock,
+    defaultModels: { general: defaultModelFor("general"), adult: defaultModelFor("adult") },
+  };
   res.json(body);
+});
+
+// 文章生成に使えるモデル（Ollama に入っているもの）
+app.get("/api/models", async (_req, res) => {
+  try {
+    res.json(await llm.listModels());
+  } catch (err) {
+    throw new HttpError(502, (err as Error).message);
+  }
 });
 
 const summary = (p: Project): ProjectSummary => ({
@@ -96,7 +110,7 @@ app.get("/api/projects", (_req, res) => {
   res.json(listProjects().map(summary));
 });
 
-app.post("/api/projects", (req, res) => {
+app.post("/api/projects", async (req, res) => {
   const synopsis = String(req.body.synopsis ?? "").trim();
   const title = text(req.body.title, 60);
   const pageCount = Math.floor(Number(req.body.pageCount));
@@ -109,8 +123,13 @@ app.post("/api/projects", (req, res) => {
   const rating = req.body.rating === "adult" ? "adult" : "general";
   if (rating === "adult" && req.body.adultConfirmed !== true) throw new HttpError(400, "成人向けの作品を作るには、18歳以上であることの確認が必要です");
   rejectMinorReference({ rating }, "概要・タイトル・絵柄", synopsis, title, customStyle);
+  const model = normalizeModelName(String(req.body.model || defaultModelFor(rating)));
+  const models = config.mock ? null : await llm.listModels().catch(() => null);
+  if (models && !models.some((m) => m.name === model)) {
+    throw new HttpError(400, `モデル ${model} が Ollama に入っていません。ターミナルで「ollama pull ${model}」を実行してください。`);
+  }
   const style = resolveStyle(String(req.body.styleId ?? ""), customStyle);
-  const project = createProject({ synopsis, pageCount, style, title, rating });
+  const project = createProject({ synopsis, pageCount, style, title, rating, model: config.mock ? "mock" : model });
   res.status(201).json({ id: project.id });
 });
 

@@ -30,7 +30,7 @@ VRAM 16GB 程度の GPU 1 枚で動きます。
 
 ### 成人向け（R18）
 
-作成時に年齢区分で「成人向け」を選ぶと、性的な描写を含む作品を作れます。文章は `OLLAMA_ADULT_MODEL` のモデル（既定は dolphin-mistral。`ollama pull` で別途取得）で作り、全年齢の作品とは分けています。
+作成時に年齢区分で「成人向け」を選ぶと、性的な描写を含む作品を作れます。ストーリーを作るモデルは、成人向けを選ぶと `OLLAMA_ADULT_MODEL`（既定は dolphin-mistral。`ollama pull` で別途取得）に切り替わります。
 
 登場人物はすべて 20 歳以上の成人として扱い、未成年を想起させる内容は作りません。
 
@@ -49,7 +49,7 @@ VRAM 16GB 程度の GPU 1 枚で動きます。
 ollama pull gemma3:12b
 ```
 
-VRAM 16GB なら `gemma3:12b` や `qwen3:14b` が目安です。使うモデルは `.env` の `OLLAMA_MODEL` で変えられます。
+VRAM 16GB なら `gemma3:12b` や `qwen3:14b` が目安です。ストーリーを作るモデルは、作成画面で Ollama に入っているものから作品ごとに選べます（最初に選ばれるモデルは `.env` の `OLLAMA_MODEL` / `OLLAMA_ADULT_MODEL`）。
 
 ### 2. 画像生成サーバ（image-server/）
 
@@ -120,8 +120,8 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml exec ollama ollam
 
 | 変数 | 説明 |
 |---|---|
-| `OLLAMA_URL` / `OLLAMA_MODEL` / `OLLAMA_NUM_CTX` | Ollama の接続先・モデル・コンテキスト長 |
-| `OLLAMA_ADULT_MODEL` | 成人向け（R18）の作品で使うモデル |
+| `OLLAMA_URL` / `OLLAMA_NUM_CTX` | Ollama の接続先・コンテキスト長 |
+| `OLLAMA_MODEL` / `OLLAMA_ADULT_MODEL` | 作成画面で最初に選ばれるモデル（全年齢 / 成人向け） |
 | `DIFFUSERS_URL` | 画像生成サーバの接続先 |
 | `DIFFUSERS_MODEL` / `DIFFUSERS_OFFLOAD` | 画像生成サーバのモデル・VRAM 節約モード（画像生成サーバ側の設定） |
 | `PORT` / `MAX_PAGES` | アプリのポート・最大ページ数 |

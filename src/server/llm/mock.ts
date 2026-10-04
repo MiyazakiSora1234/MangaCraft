@@ -10,6 +10,7 @@ async function wait(ms: number, signal?: AbortSignal) {
 
 export const mockLlm: Llm = {
   describe: () => "モック",
+  listModels: async () => [{ name: "mock", parameterSize: "" }],
   release: async () => {},
 
   async generatePlan({ synopsis, pageCount, title }, signal) {

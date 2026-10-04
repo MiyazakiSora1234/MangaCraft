@@ -3,7 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { config } from "./config.ts";
+import { config, defaultModelFor } from "./config.ts";
 import type { Project } from "../shared/types.ts";
 
 export const DATA_DIR = path.resolve(config.dataDir);
@@ -20,8 +20,9 @@ export async function initStore(): Promise<Project[]> {
     if (!file.endsWith(".json")) continue;
     try {
       const project = JSON.parse(await fs.readFile(path.join(PROJECT_DIR, file), "utf8")) as Project;
-      // 年齢区分と登場人物の年齢は後から加えた項目なので、以前の作品には既定値を入れる
+      // 年齢区分・モデル・登場人物の年齢は後から加えた項目なので、以前の作品には既定値を入れる
       project.rating ??= "general";
+      project.model ??= defaultModelFor(project.rating);
       for (const c of project.characters) c.age ??= null;
       cache.set(project.id, project);
     } catch (err) {

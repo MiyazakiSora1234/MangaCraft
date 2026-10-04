@@ -1,6 +1,6 @@
 // ホーム：作成フォームと作品一覧
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { ContentRating, ProjectSummary } from "../../shared/types.ts";
+import { normalizeModelName, type ContentRating, type ModelInfo, type ProjectSummary } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useConfig } from "../config.ts";
 import { projectHash } from "../hooks/route.ts";
@@ -24,7 +24,7 @@ export function HomePage() {
 }
 
 function CreateForm() {
-  const { styles, maxPages } = useConfig();
+  const { styles, maxPages, defaultModels, mock } = useConfig();
   const toast = useToast();
   const [synopsis, setSynopsis] = useState("");
   const [title, setTitle] = useState("");
@@ -33,7 +33,22 @@ function CreateForm() {
   const [customStyle, setCustomStyle] = useState("");
   const [rating, setRating] = useState<ContentRating>("general");
   const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [model, setModel] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Ollama に入っているモデルを読み込む
+  useEffect(() => {
+    api.listModels().then(setModels, (err: Error) => setModelError(err.message));
+  }, []);
+
+  // 年齢区分を変えたら、その区分の既定のモデルを選び直す（入っていなければ一覧の先頭）
+  useEffect(() => {
+    if (!models?.length) return;
+    const preferred = normalizeModelName(defaultModels[rating]);
+    setModel(models.some((m) => m.name === preferred) ? preferred : models[0].name);
+  }, [models, rating, defaultModels]);
 
   const clampPages = (n: number) => Math.min(maxPages, Math.max(1, n || 1));
 
@@ -45,7 +60,7 @@ function CreateForm() {
     }
     setSubmitting(true);
     try {
-      const { id } = await api.createProject({ synopsis, title, pageCount, styleId, customStyle, rating, adultConfirmed });
+      const { id } = await api.createProject({ synopsis, title, pageCount, styleId, customStyle, rating, adultConfirmed, model: model || undefined });
       location.hash = projectHash(id);
     } catch (err) {
       toast((err as Error).message, true);
@@ -117,6 +132,23 @@ function CreateForm() {
           </div>
         )}
       </div>
+      {!mock && (
+        <label className="field">
+          <span>ストーリーを作るモデル <small className="muted">（Ollama に入っているもの）</small></span>
+          {modelError ? (
+            <p className="error-text">{modelError}</p>
+          ) : (
+            <select value={model} onChange={(e) => setModel(e.target.value)} disabled={!models}>
+              {!models && <option>読み込み中…</option>}
+              {models?.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}{m.parameterSize ? `（${m.parameterSize}）` : ""}{m.name === normalizeModelName(defaultModels[rating]) ? " ・おすすめ" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </label>
+      )}
       <div className="form-actions">
         <button className="btn primary large" type="submit" disabled={submitting}>漫画を生成する</button>
       </div>

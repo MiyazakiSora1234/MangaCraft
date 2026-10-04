@@ -60,6 +60,8 @@ export function Sidebar({ project, page, onRegenerate, onRelayout, onStyleRefCha
         )}
       </div>
 
+      <p className="hint muted">ストーリーのモデル：{project.model}</p>
+
       <details className="cast">
         <summary>登場人物（{project.characters.length}）</summary>
         <ul>

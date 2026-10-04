@@ -1,5 +1,4 @@
 // Ollama でストーリー構成とネームを作る。出力は JSON Schema（format）で形を指定する
-import type { ContentRating } from "../../shared/types.ts";
 import { assertAdultPlan, assertAdultScript } from "../adult.ts";
 import { config } from "../config.ts";
 import type { Llm } from "./index.ts";
@@ -10,8 +9,6 @@ import { pageSchema, planSchema } from "./schema.ts";
 const { url, numCtx } = config.ollama;
 const MAX_ATTEMPTS = 3;
 
-// 成人向けの作品だけ別のモデルを使う
-const modelFor = (rating: ContentRating) => (rating === "adult" ? config.ollama.adultModel : config.ollama.model);
 
 // 応答はストリーミングで受け取る（生成に数分かかってもタイムアウトしないように）
 async function chat(model: string, prompt: string, schema: object, signal?: AbortSignal): Promise<string> {
@@ -72,20 +69,33 @@ async function generate<T>(model: string, prompt: string, schema: object, transf
 }
 
 export const ollama: Llm = {
-  describe: () => `Ollama ${config.ollama.model}・成人向け ${config.ollama.adultModel} (${url})`,
+  describe: () => `Ollama (${url})`,
+
+  async listModels() {
+    let res: Response;
+    try {
+      res = await fetch(`${url}/api/tags`);
+    } catch {
+      throw new Error(`Ollama（${url}）に接続できません。起動しているか確認してください。`);
+    }
+    const json = (await res.json()) as { models?: { name: string; details?: { parameter_size?: string } }[] };
+    return (json.models ?? [])
+      .map((m) => ({ name: m.name, parameterSize: m.details?.parameter_size ?? "" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
 
   // 成人向けの作品では、出力に未成年が含まれていないかを確認し、含まれていれば作り直す
-  generatePlan: (input, signal) => generate(modelFor(input.rating), planPrompt(input), planSchema, (json) => {
+  generatePlan: (input, signal) => generate(input.model, planPrompt(input), planSchema, (json) => {
     const plan = finalizePlan(json, input);
     if (input.rating === "adult") assertAdultPlan(plan);
     return plan;
   }, signal),
 
   generatePageScript(input, signal) {
-    const { rating } = input.project;
+    const { rating, model } = input.project;
     const prompt = pagePrompt(input);
     const minPanels = minPanelsFor(input.project.outline[input.pageNumber - 1]);
-    return withCoverage(() => generate(modelFor(rating), prompt, pageSchema, (json) => {
+    return withCoverage(() => generate(model, prompt, pageSchema, (json) => {
       const script = normalizeScript(json);
       if (rating === "adult") assertAdultScript(script);
       return script;
@@ -93,12 +103,14 @@ export const ollama: Llm = {
   },
 
   // モデルをメモリから降ろす（作画前に VRAM を空けるため）。失敗しても処理は続ける
+  // 読み込まれているモデルをすべてメモリから降ろす
   async release() {
-    for (const model of new Set([config.ollama.model, config.ollama.adultModel])) {
+    const loaded = await fetch(`${url}/api/ps`).then((r) => r.json() as Promise<{ models?: { name: string }[] }>, () => ({ models: [] }));
+    for (const { name } of loaded.models ?? []) {
       await fetch(`${url}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, keep_alive: 0 }),
+        body: JSON.stringify({ model: name, keep_alive: 0 }),
       }).catch(() => {});
     }
   },

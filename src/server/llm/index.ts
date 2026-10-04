@@ -2,11 +2,14 @@
 import { config } from "../config.ts";
 import { mockLlm } from "./mock.ts";
 import { ollama } from "./ollama.ts";
+import type { ModelInfo } from "../../shared/types.ts";
 import type { PageScript, Plan } from "./output.ts";
 import type { PageInput, PlanInput } from "./prompts.ts";
 
 export interface Llm {
   describe(): string;
+  // 使えるモデルの一覧
+  listModels(): Promise<ModelInfo[]>;
   // signal で中断すると、生成途中でも打ち切る
   generatePlan(input: PlanInput, signal?: AbortSignal): Promise<Plan>;
   generatePageScript(input: PageInput, signal?: AbortSignal): Promise<PageScript>;

@@ -1,3 +1,5 @@
+import { normalizeModelName } from "../shared/types.ts";
+
 // 設定（環境変数と起動オプション）をここに集約する。ほかのモジュールは process.env を直接読まない。
 // 項目の説明は .env.example を参照。
 const env = process.env;
@@ -19,10 +21,13 @@ export const config = {
   mock: process.argv.includes("--mock"),
   ollama: {
     url: serviceUrl("OLLAMA_URL", "http://localhost:11434"),
+    // 作成画面で最初に選ばれているモデル（全年齢 / 成人向け）
     model: str("OLLAMA_MODEL", "gemma3:12b"),
-    // 成人向け（R18）の作品だけで使うモデル
     adultModel: str("OLLAMA_ADULT_MODEL", "dolphin-mistral"),
     numCtx: Number(str("OLLAMA_NUM_CTX", "16384")),
   },
   diffusersUrl: serviceUrl("DIFFUSERS_URL", "http://localhost:7861"),
 };
+
+export const defaultModelFor = (rating: "general" | "adult") =>
+  normalizeModelName(rating === "adult" ? config.ollama.adultModel : config.ollama.model);

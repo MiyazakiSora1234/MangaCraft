@@ -1,6 +1,6 @@
 // サーバ API の呼び出し
 import type {
-  AppConfig, Bubble, CreateProjectRequest, Page, Panel, Project, ProjectSummary, RegenerateMode, StyleRef,
+  AppConfig, Bubble, CreateProjectRequest, ModelInfo, Page, Panel, Project, ProjectSummary, RegenerateMode, StyleRef,
 } from "../shared/types.ts";
 
 async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -21,6 +21,7 @@ const panelPath = (id: string, n: number, i: number) => `${pagePath(id, n)}/pane
 
 export const api = {
   config: () => request<AppConfig>("/api/config"),
+  listModels: () => request<ModelInfo[]>("/api/models"),
 
   listProjects: () => request<ProjectSummary[]>("/api/projects"),
   createProject: (body: CreateProjectRequest) => request<{ id: string }>("/api/projects", { method: "POST", body }),

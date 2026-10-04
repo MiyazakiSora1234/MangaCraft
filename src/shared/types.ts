@@ -116,6 +116,7 @@ export interface Project {
   error: string | null;
   input: { synopsis: string; pageCount: number; title: string };
   rating: ContentRating;
+  model: string; // 文章生成に使う Ollama のモデル
   style: Style;
   title: string;
   logline: string;
@@ -143,6 +144,16 @@ export interface AppConfig {
   styles: Style[];
   maxPages: number;
   mock: boolean; // LLM・画像生成を使わないモックで動いているか
+  defaultModels: Record<ContentRating, string>; // 年齢区分ごとの既定のモデル
+}
+
+// Ollama のモデル名はタグを省くと :latest になる（dolphin3 = dolphin3:latest）
+export const normalizeModelName = (name: string) => (name.includes(":") ? name : `${name}:latest`);
+
+// Ollama に入っているモデル
+export interface ModelInfo {
+  name: string;
+  parameterSize: string; // 例: "12.2B"
 }
 
 export interface CreateProjectRequest {
@@ -152,6 +163,7 @@ export interface CreateProjectRequest {
   styleId: string;
   customStyle?: string;
   rating: ContentRating;
+  model?: string; // 省略時は年齢区分ごとの既定のモデル
   adultConfirmed?: boolean; // 成人向けのとき、利用者が 18 歳以上であることの確認
 }
 

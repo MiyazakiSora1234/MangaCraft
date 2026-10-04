@@ -9,6 +9,7 @@ export interface PlanInput {
   title: string;
   style: Style;
   rating: ContentRating;
+  model: string;
 }
 
 export interface PageInput {
