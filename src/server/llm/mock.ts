@@ -2,14 +2,18 @@
 import { BUBBLE_POSITIONS, PANEL_INTENSITIES, PANEL_SHOTS, PANEL_SIZES } from "../../shared/types.ts";
 import type { Llm } from "./index.ts";
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// 待つあいだに中断されたら打ち切る
+async function wait(ms: number, signal?: AbortSignal) {
+  await new Promise((r) => setTimeout(r, ms));
+  signal?.throwIfAborted();
+}
 
 export const mockLlm: Llm = {
   describe: () => "モック",
   release: async () => {},
 
-  async generatePlan({ synopsis, pageCount, title }) {
-    await wait(800);
+  async generatePlan({ synopsis, pageCount, title }, signal) {
+    await wait(800, signal);
     return {
       facts: [],
       title: title || "（モック）" + synopsis.slice(0, 12),
@@ -26,8 +30,8 @@ export const mockLlm: Llm = {
     };
   },
 
-  async generatePageScript({ pageNumber, instruction }) {
-    await wait(600);
+  async generatePageScript({ pageNumber, instruction }, signal) {
+    await wait(600, signal);
     const count = 3 + ((pageNumber + (instruction ? 2 : 0)) % 4);
     const panels = Array.from({ length: count }, (_, i) => ({
       description: `${pageNumber}ページ・コマ${i + 1}${instruction ? "（修正版）" : ""}`,

@@ -23,11 +23,12 @@ interface PanelImageRequest {
   aspect: number;
   label: string;
   styleRef?: string; // 絵柄の見本にする画像の URL（/images/...）
+  signal?: AbortSignal;
 }
 
 // 画像を生成して保存し、ブラウザから参照する URL を返す
-export async function generatePanelImage({ projectId, key, prompt, aspect, label, styleRef }: PanelImageRequest): Promise<string> {
-  const { buffer, ext } = await generator.generate({ prompt, aspect, label, styleImage: await readImageBase64(styleRef) });
+export async function generatePanelImage({ projectId, key, prompt, aspect, label, styleRef, signal }: PanelImageRequest): Promise<string> {
+  const { buffer, ext } = await generator.generate({ prompt, aspect, label, styleImage: await readImageBase64(styleRef), signal });
   return saveImage(projectId, key, buffer, ext);
 }
 

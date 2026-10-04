@@ -60,7 +60,7 @@ export interface DynamicLayout {
 }
 
 
-export type PageStatus = "pending" | "scripting" | "drawing" | "done" | "error";
+export type PageStatus = "pending" | "scripting" | "drawing" | "done" | "error" | "cancelled";
 
 // 生成処理の途中にあるページの状態
 const BUSY_PAGE_STATUSES: readonly PageStatus[] = ["pending", "scripting", "drawing"];
@@ -103,7 +103,7 @@ export interface StyleRef {
   auto: boolean; // 自動で選ばれた見本か
 }
 
-export type ProjectStatus = "planning" | "ready" | "error";
+export type ProjectStatus = "planning" | "ready" | "error" | "cancelled";
 
 // general = 全年齢 / adult = 成人向け（R18）
 export type ContentRating = "general" | "adult";

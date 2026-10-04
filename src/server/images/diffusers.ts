@@ -11,12 +11,13 @@ const TIMEOUT_MS = 30 * 60 * 1000;
 const agent = new Agent({ headersTimeout: TIMEOUT_MS, bodyTimeout: TIMEOUT_MS });
 
 export const diffusers: ImageGenerator = {
-  async generate({ prompt, aspect, styleImage }) {
+  async generate({ prompt, aspect, styleImage, signal }) {
     const [width, height] = sdSize(aspect);
     let res;
     try {
       res = await fetch(`${url}/generate`, {
         dispatcher: agent,
+        signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -28,7 +29,8 @@ export const diffusers: ImageGenerator = {
           style_image: styleImage,
         }),
       });
-    } catch {
+    } catch (err) {
+      if (signal?.aborted) throw err;
       throw new Error(`画像生成サーバ（${url}）に接続できません。起動しているか確認してください。`);
     }
     if (!res.ok) throw new Error(`画像生成サーバ エラー (${res.status}): ${(await res.text().catch(() => "")).slice(0, 300)}`);

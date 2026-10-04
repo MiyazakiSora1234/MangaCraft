@@ -6,7 +6,8 @@ import type { AppConfig, Page, Project, ProjectSummary } from "../shared/types.t
 import { findMinorReference } from "./adult.ts";
 import { config } from "./config.ts";
 import {
-  createProject, isPageLocked, recoverInterrupted, regeneratePage, regeneratePanel, relayoutPage, retryPlan, setStyleRef,
+  cancelProject, createProject, isPageLocked, isProjectRunning, recoverInterrupted, regeneratePage, regeneratePanel, relayoutPage, retryPlan,
+  setStyleRef,
 } from "./generator.ts";
 import { llm } from "./llm/index.ts";
 import { deleteProject, getProject, IMAGE_DIR, initStore, listProjects, saveProject } from "./store.ts";
@@ -124,9 +125,17 @@ app.delete("/api/projects/:id", async (_req, res) => {
 
 app.post("/api/projects/:id/retry", (_req, res) => {
   const { project } = locals(res);
-  if (project.status !== "error") throw new HttpError(409, "再試行できる状態ではありません");
+  if (project.status !== "error" && project.status !== "cancelled") throw new HttpError(409, "再試行できる状態ではありません");
   retryPlan(project);
   res.status(202).json({ ok: true });
+});
+
+// 生成を中断する（構成中なら構成を、ページの生成中ならそのページを止める）
+app.post("/api/projects/:id/cancel", (_req, res) => {
+  const { project } = locals(res);
+  if (!isProjectRunning(project)) throw new HttpError(409, "生成中ではありません");
+  cancelProject(project);
+  res.json(project);
 });
 
 // 絵柄の見本にするコマを選ぶ（{ page, panel }。{ clear: true } で解除）

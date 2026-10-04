@@ -22,6 +22,48 @@ export function isPageLocked(project: Project, n: number): boolean {
 
 const errorMessage = (err: unknown) => (err as Error)?.message || String(err);
 
+// ---------- 中断 ----------
+// 作品ごとの中断の合図。中断すると、通信中の LLM・画像生成を打ち切り、その作品の処理は次の区切りで止まる
+
+const controllers = new Map<string, AbortController>();
+
+function signalFor(project: Project): AbortSignal {
+  let controller = controllers.get(project.id);
+  if (!controller || controller.signal.aborted) {
+    controller = new AbortController();
+    controllers.set(project.id, controller);
+  }
+  return controller.signal;
+}
+
+// 生成中の処理がある作品か
+export function isProjectRunning(project: Project): boolean {
+  return project.status === "planning" || project.pages.some((p) => isPageLocked(project, p.number));
+}
+
+// 中断したページ。描き直し途中のコマは前の絵に戻し、絵がないコマは失敗扱いにする
+function markCancelled(page: Page): void {
+  page.status = "cancelled";
+  page.error = "中断しました。「このページを作り直す」で再開できます。";
+  for (const panel of page.panels) {
+    if (panel.image.status !== "pending" && panel.image.status !== "drawing") continue;
+    panel.image = panel.image.url
+      ? { ...panel.image, status: "done", error: null }
+      : { ...panel.image, status: "error", error: "中断しました" };
+  }
+}
+
+export function cancelProject(project: Project): void {
+  controllers.get(project.id)?.abort();
+  controllers.delete(project.id);
+  if (project.status === "planning") {
+    project.status = "cancelled";
+    project.error = "中断しました。";
+  }
+  for (const page of project.pages) if (isPageBusy(page)) markCancelled(page);
+  saveProject(project);
+}
+
 // 同じページへの処理を 1 つに限り、終わったら必ず保存する
 async function exclusive(project: Project, n: number, fn: () => Promise<void>): Promise<void> {
   const key = pageKey(project, n);
@@ -83,9 +125,11 @@ export function retryPlan(project: Project): void {
 }
 
 async function runProject(project: Project): Promise<void> {
+  const signal = signalFor(project);
   try {
     await prepareGpuForLlm();
-    const plan = await llm.generatePlan({ ...project.input, style: project.style, rating: project.rating });
+    const plan = await llm.generatePlan({ ...project.input, style: project.style, rating: project.rating }, signal);
+    signal.throwIfAborted();
     Object.assign(project, {
       title: plan.title,
       logline: plan.logline,
@@ -97,6 +141,7 @@ async function runProject(project: Project): Promise<void> {
     });
     saveProject(project);
   } catch (err) {
+    if (signal.aborted) return; // 中断（状態は cancelProject で変えてある）
     console.error("[plan]", err);
     project.status = "error";
     project.error = errorMessage(err);
@@ -104,10 +149,14 @@ async function runProject(project: Project): Promise<void> {
     return;
   }
   // 1) 全ページのネームを先に作る。前のページの終わり方を踏まえて続きを書けるよう、1ページずつ順番に
-  for (const page of project.pages) await runPage(project, page.number, { draw: false });
+  for (const page of project.pages) {
+    if (signal.aborted) return;
+    await runPage(project, page.number, { draw: false });
+  }
   // 2) LLM を VRAM から降ろしてから、まとめて作画する
   await prepareGpuForImages();
   for (const page of project.pages) {
+    if (signal.aborted) return;
     if (page.panels.length && page.status === "pending") await runPage(project, page.number, { mode: "images" });
   }
 }
@@ -122,6 +171,7 @@ interface RunPageOptions {
 
 function runPage(project: Project, n: number, { instruction = "", mode = "all", draw = true }: RunPageOptions): Promise<void> {
   const page = project.pages[n - 1];
+  const signal = signalFor(project);
   return exclusive(project, n, async () => {
     try {
       page.error = null;
@@ -129,7 +179,8 @@ function runPage(project: Project, n: number, { instruction = "", mode = "all", 
         page.status = "scripting";
         await prepareGpuForLlm();
         saveProject(project);
-        const script = await llm.generatePageScript({ project, pageNumber: n, instruction });
+        const script = await llm.generatePageScript({ project, pageNumber: n, instruction }, signal);
+        signal.throwIfAborted();
         page.panels = script.panels.map((p) => ({ ...p, image: { url: null, status: "pending", error: null } }));
         page.layout = newLayout(project, page);
         if (draw) await prepareGpuForImages();
@@ -142,9 +193,13 @@ function runPage(project: Project, n: number, { instruction = "", mode = "all", 
       }
       page.status = "drawing";
       saveProject(project);
-      for (let i = 0; i < page.panels.length; i++) await drawPanel(project, page, i, instruction);
+      for (let i = 0; i < page.panels.length; i++) await drawPanel(project, page, i, instruction, signal);
       settlePage(page);
     } catch (err) {
+      if (signal.aborted) {
+        markCancelled(page);
+        return;
+      }
       console.error(`[page ${n}]`, err);
       page.status = "error";
       page.error = errorMessage(err);
@@ -159,11 +214,16 @@ export function regeneratePage(project: Project, n: number, opts: { mode: Regene
 
 export function regeneratePanel(project: Project, n: number, i: number, instruction = ""): void {
   const page = project.pages[n - 1];
+  const signal = signalFor(project);
   exclusive(project, n, async () => {
     page.status = "drawing";
     page.error = null;
-    await drawPanel(project, page, i, instruction);
-    settlePage(page);
+    try {
+      await drawPanel(project, page, i, instruction, signal);
+      settlePage(page);
+    } catch {
+      markCancelled(page); // drawPanel が投げるのは中断のときだけ
+    }
   }).catch((err) => console.error(err));
 }
 
@@ -177,7 +237,9 @@ export function relayoutPage(project: Project, n: number): Page {
 
 // ---------- コマ ----------
 
-async function drawPanel(project: Project, page: Page, i: number, extra = ""): Promise<void> {
+// 中断されたときだけ例外を投げる（画像生成の失敗はコマを失敗扱いにして続ける）
+async function drawPanel(project: Project, page: Page, i: number, extra: string, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
   const panel = page.panels[i];
   const aspect = page.layout?.panels[i]?.aspect ?? 1;
   panel.image.status = "drawing";
@@ -190,6 +252,7 @@ async function drawPanel(project: Project, page: Page, i: number, extra = ""): P
       aspect,
       label: panel.description,
       styleRef: project.styleRef?.url,
+      signal,
     });
     panel.image = { url, status: "done", error: null };
     // まだ見本がなければ、最初に描けた「人物が写っているコマ」を絵柄の見本にする
@@ -197,6 +260,7 @@ async function drawPanel(project: Project, page: Page, i: number, extra = ""): P
       project.styleRef = { url, page: page.number, panel: i, auto: true };
     }
   } catch (err) {
+    if (signal.aborted) throw err;
     console.error(`[image p${page.number}-${i}]`, err);
     panel.image = { ...panel.image, status: "error", error: errorMessage(err) };
   }

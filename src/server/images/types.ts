@@ -11,6 +11,7 @@ interface ImageRequest {
   aspect: number; // コマの縦横比（幅 / 高さ）
   label: string; // コマの内容（仮画像に表示する）
   styleImage: string | null; // 絵柄の見本（base64）
+  signal?: AbortSignal; // 中断すると、生成の完了を待たずに打ち切る
 }
 
 export interface ImageGenerator {

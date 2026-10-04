@@ -7,6 +7,7 @@ export const PAGE_STATUS_LABEL: Record<PageStatus, string> = {
   drawing: "作画中",
   done: "完成",
   error: "エラー",
+  cancelled: "中断",
 };
 
 // 作品一覧のタグ（完成した作品には出さない）
@@ -14,6 +15,7 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   planning: "構成中",
   ready: "",
   error: "エラー",
+  cancelled: "中断",
 };
 
 export const BUBBLE_TYPE_LABEL: Record<BubbleType, string> = {

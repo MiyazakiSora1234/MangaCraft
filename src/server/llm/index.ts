@@ -7,8 +7,9 @@ import type { PageInput, PlanInput } from "./prompts.ts";
 
 export interface Llm {
   describe(): string;
-  generatePlan(input: PlanInput): Promise<Plan>;
-  generatePageScript(input: PageInput): Promise<PageScript>;
+  // signal で中断すると、生成途中でも打ち切る
+  generatePlan(input: PlanInput, signal?: AbortSignal): Promise<Plan>;
+  generatePageScript(input: PageInput, signal?: AbortSignal): Promise<PageScript>;
   // モデルを VRAM から降ろす（画像生成に GPU を譲るため）
   release(): Promise<void>;
 }

@@ -14,10 +14,11 @@ const MAX_ATTEMPTS = 3;
 const modelFor = (rating: ContentRating) => (rating === "adult" ? config.ollama.adultModel : config.ollama.model);
 
 // 応答はストリーミングで受け取る（生成に数分かかってもタイムアウトしないように）
-async function chat(model: string, prompt: string, schema: object): Promise<string> {
+async function chat(model: string, prompt: string, schema: object, signal?: AbortSignal): Promise<string> {
   let res: Response;
   try {
     res = await fetch(`${url}/api/chat`, {
+      signal,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -28,7 +29,8 @@ async function chat(model: string, prompt: string, schema: object): Promise<stri
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }],
       }),
     });
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     throw new Error(`Ollama（${url}）に接続できません。起動しているか確認してください。`);
   }
   if (res.status === 404) throw new Error(`Ollama にモデル ${model} がありません。ターミナルで「ollama pull ${model}」を実行してください。`);
@@ -55,10 +57,10 @@ async function chat(model: string, prompt: string, schema: object): Promise<stri
 }
 
 // 出力が壊れていた場合（JSON として読めない・コマが空など）だけ数回やり直す
-async function generate<T>(model: string, prompt: string, schema: object, transform: (json: unknown) => T): Promise<T> {
+async function generate<T>(model: string, prompt: string, schema: object, transform: (json: unknown) => T, signal?: AbortSignal): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const text = await chat(model, prompt, schema);
+    const text = await chat(model, prompt, schema, signal);
     try {
       return transform(JSON.parse(text));
     } catch (err) {
@@ -73,13 +75,13 @@ export const ollama: Llm = {
   describe: () => `Ollama ${config.ollama.model}・成人向け ${config.ollama.adultModel} (${url})`,
 
   // 成人向けの作品では、出力に未成年が含まれていないかを確認し、含まれていれば作り直す
-  generatePlan: (input) => generate(modelFor(input.rating), planPrompt(input), planSchema, (json) => {
+  generatePlan: (input, signal) => generate(modelFor(input.rating), planPrompt(input), planSchema, (json) => {
     const plan = finalizePlan(json, input);
     if (input.rating === "adult") assertAdultPlan(plan);
     return plan;
-  }),
+  }, signal),
 
-  generatePageScript(input) {
+  generatePageScript(input, signal) {
     const { rating } = input.project;
     const prompt = pagePrompt(input);
     const minPanels = minPanelsFor(input.project.outline[input.pageNumber - 1]);
@@ -87,7 +89,7 @@ export const ollama: Llm = {
       const script = normalizeScript(json);
       if (rating === "adult") assertAdultScript(script);
       return script;
-    }), minPanels);
+    }, signal), minPanels);
   },
 
   // モデルをメモリから降ろす（作画前に VRAM を空けるため）。失敗しても処理は続ける

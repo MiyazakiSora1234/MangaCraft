@@ -27,24 +27,48 @@ export function ProjectPage({ id, initialPage }: { id: string; initialPage: numb
         <h2>ストーリーを構成しています…</h2>
         <p className="muted">登場人物と{project.input.pageCount}ページ分の展開を考えています。1分ほどお待ちください。</p>
         <blockquote>{project.input.synopsis}</blockquote>
+        <div className="row-actions center">
+          <CancelButton project={project} onCancelled={setProject} />
+        </div>
       </div>
     );
   }
 
-  if (project.status === "error" && !project.pages.length) {
+  if ((project.status === "error" || project.status === "cancelled") && !project.pages.length) {
+    const cancelled = project.status === "cancelled";
     return (
       <div className="card center">
-        <h2>ストーリーの構成に失敗しました</h2>
-        <p className="error-text">{project.error}</p>
+        <h2>{cancelled ? "ストーリーの構成を中断しました" : "ストーリーの構成に失敗しました"}</h2>
+        {!cancelled && <p className="error-text">{project.error}</p>}
         <div className="row-actions center">
           <a className="btn ghost" href="#/">戻る</a>
-          <button className="btn primary" onClick={() => run(async () => { await api.retryPlan(id); await reload(); })}>もう一度試す</button>
+          <button className="btn primary" onClick={() => run(async () => { await api.retryPlan(id); await reload(); })}>
+            {cancelled ? "再開する" : "もう一度試す"}
+          </button>
         </div>
       </div>
     );
   }
 
   return <Viewer project={project} setProject={setProject} reload={reload} busy={busy} initialPage={initialPage} />;
+}
+
+// 生成を中断する。止めたページは「このページを作り直す」で再開できる
+function CancelButton({ project, onCancelled }: { project: Project; onCancelled: (p: Project) => void }) {
+  const run = useAction();
+  const toast = useToast();
+  const [cancelling, setCancelling] = useState(false);
+  const cancel = () => run(async () => {
+    if (!confirm("生成を中断しますか？")) return;
+    setCancelling(true);
+    try {
+      onCancelled(await api.cancel(project.id));
+      toast("生成を中断しました");
+    } finally {
+      setCancelling(false);
+    }
+  });
+  return <button className="btn danger small" disabled={cancelling} onClick={cancel}>■ 中断</button>;
 }
 
 interface ViewerProps {
@@ -119,6 +143,7 @@ function Viewer({ project, setProject, reload, busy, initialPage }: ViewerProps)
             <div className="progress-bar" style={{ width: `${(done / total) * 100}%` }} />
             <span>{done} / {total} ページ完成</span>
           </div>
+          {busy && <CancelButton project={project} onCancelled={setProject} />}
           <PrintButton pages={project.pages} disabled={busy} />
         </div>
       </div>

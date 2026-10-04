@@ -27,6 +27,7 @@ export const api = {
   getProject: (id: string) => request<Project>(projectPath(id)),
   deleteProject: (id: string) => request<void>(projectPath(id), { method: "DELETE" }),
   retryPlan: (id: string) => request<void>(`${projectPath(id)}/retry`, { method: "POST" }),
+  cancel: (id: string) => request<Project>(`${projectPath(id)}/cancel`, { method: "POST" }),
 
   setStyleRef: (id: string, page: number, panel: number) =>
     request<{ styleRef: StyleRef | null }>(`${projectPath(id)}/style-ref`, { method: "POST", body: { page, panel } }),

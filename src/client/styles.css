@@ -52,6 +52,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
 .btn.small { padding: 6px 12px; font-size: 14px; }
 .btn.large { padding: 14px 32px; font-size: 17px; font-weight: 700; }
 .btn.block { width: 100%; }
+.btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn.danger:hover:not(:disabled) { background: #fde8e8; }
 .icon-btn { border: 0; background: transparent; color: var(--muted); cursor: pointer; width: 32px; height: 32px; border-radius: 8px; font-size: 14px; flex-shrink: 0; }
 .icon-btn:hover { background: var(--bg); color: var(--danger); }
 
