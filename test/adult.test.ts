@@ -47,6 +47,17 @@ test("成人向けの画像プロンプトは幼さを示す語を除き、成�
   assert.match(prompt.negative, /\bchild\b.*\bloli\b/);
 });
 
+test("人数付き・複数形の girl / boy タグも取り除く", () => {
+  const prompt = buildImagePrompt({
+    panel: { imagePrompt: "2girls, 1boy, schoolgirls, young women", characters: [] },
+    style: { id: "s", label: "s", prompt: "monochrome" },
+    characters: [],
+    rating: "adult",
+  });
+  assert.doesNotMatch(prompt.positive, /girls?|boys?|young/i);
+  assert.match(prompt.positive, /\bwomen\b/);
+});
+
 test("全年齢の画像プロンプトには成人向けの指定を入れない", () => {
   const prompt = buildImagePrompt({
     panel: { imagePrompt: "a girl smiling", characters: [] },

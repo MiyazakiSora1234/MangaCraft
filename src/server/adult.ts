@@ -40,7 +40,8 @@ export function assertNoMinorReference(where: string, ...texts: string[]): void 
 }
 
 // 画像のプロンプトから幼さを示す言葉を取り除き、成人であることを明示する
-const YOUTHFUL_WORDS = /\b(?:loli\w*|shota\w*|child\w*|kids?|teen\w*|underage|minor|petite|small breasts|flat chest|young|little|tiny|cute girl|schoolgirl|schoolboy|school uniform|randoseru|1girl|1boy|girl|boy)\b/gi;
+// girl / boy は人数付き（1girl・2girls）や複数形も含めて取り除く
+const YOUTHFUL_WORDS = /\b(?:loli\w*|shota\w*|child\w*|kids?|teen\w*|underage|minor|petite|small breasts|flat chest|young|little|tiny|cute|schoolgirls?|schoolboys?|school uniform|randoseru|\d*(?:girl|boy)s?)\b/gi;
 
 export const ADULT_POSITIVE = "adult, mature, nsfw";
 export const ADULT_NEGATIVE = "child, loli, shota, teen, underage, young, petite, flat chest, small body, childlike, school uniform, randoseru";
